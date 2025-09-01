@@ -15,7 +15,7 @@ int main() {
     if (!lib) {
         DWORD err = GetLastError();
         printf("LoadLibrary failed, error=%lu\n", (unsigned long)err);
-        return -1;
+        return 255;
     }
 
     httpc_fn p_httpc = (httpc_fn)GetProcAddress(lib, "httpc");
@@ -25,7 +25,7 @@ int main() {
         printf("GetProcAddress failed, error=%lu (httpc=%p, httpc_free=%p)\n",
                (unsigned long)err, (void*)p_httpc, (void*)p_httpc_free);
         FreeLibrary(lib);
-        return -2;
+        return 254;
     }
 
     // 发送 GET 请求
@@ -39,7 +39,7 @@ int main() {
     } Test;
 
     Test tests[] = {
-        { "example.com GET",    "GET", "https://example.com",            200, "Example Domain" },
+        { "example.com GET",        "GET", "https://example.com",            200, "Example Domain" },
         { "httpbin.org 404",        "GET", "https://httpbin.org/status/404", 404, NULL             },
         { "httpbin.org 418 teapot", "GET", "https://httpbin.org/status/418", 418, "teapot"         },
         { "httpbin.org 503",        "GET", "https://httpbin.org/status/503", 503, NULL             },
@@ -118,13 +118,13 @@ int main() {
     if (failed == 0) {
         printf("%sOkay! All tests passed!%s\n", CONSOLE_GREEN, CONSOLE_RESET);
     } else {
-        printf("%sOhh...Some tests failed...\n\n", CONSOLE_RED);
+        printf("\n%sOhh...Some tests failed...\n\n%s", CONSOLE_RED, CONSOLE_RESET);
         printf("Hint:\n");
         printf("  Some failures may be caused by server or network issues, not by your code.\n");
-        printf("  Consider retrying or visiting the URL to check.%s\n", CONSOLE_RESET);
+        printf("  Consider retrying or visiting the URL to check.\n");
     }
 
     FreeLibrary(lib);
-    /* 返回失败用例数以便在 CI 中判断 */
-    return failed;
+    /* 返回失败用例数以便在 CI 中判断，最大不超过 126，因为 127 以上为错误数值保留 */
+    return (failed < 126) ? failed : 126;
 }

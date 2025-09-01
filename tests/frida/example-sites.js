@@ -1,6 +1,9 @@
 /// <reference path="../../@types/frida.d.ts" />
 /// <reference path="../../@types/httpc.d.ts" />
 
+/** @type {string?} */
+let g_repoPath = null;
+
 // 添加颜色常量
 const colors = {
     reset: '\x1b[0m',
@@ -153,6 +156,7 @@ function runTest(httpc, test, index) {
 
 rpc.exports = {
     init(stage, parameters) { // 测试入口
+        g_repoPath = parameters.repoPath;
         const httpc = new Httpc(parameters.modulePath);
 
         // 定义测试用例
@@ -196,6 +200,11 @@ rpc.exports = {
         }
 
         const failed = ntests - passed;
+
+        // 写入失败用例数以便在 CI 中判断，最大不超过 126，因为 127 以上为错误数值保留
+        const f = new File(g_repoPath + '\\.tmp_frida_test_result.txt', 'w');
+        f.write(Math.min(failed, 126).toString());
+        f.close();
 
         console.log("");
         if (passed > 0) {
