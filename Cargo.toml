@@ -1,5 +1,5 @@
 [package]
-name = "http-client"
+name = "dylib-http-client"
 version = "0.1.0"
 edition = "2024"
 
@@ -8,3 +8,6 @@ crate-type = ["cdylib"]
 name = "tsg_httpc"
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+ureq = "3"
