@@ -12,20 +12,21 @@
 #include <stddef.h>
 
 typedef struct {
-    char* key;
-    char* value;
+    char* key;               // offset: 0x0
+    char* value;             // offset: 0x8
 } HttpHeaderItem;
 
 typedef struct {
-    HttpHeaderItem* headers;
-    size_t count;
+    HttpHeaderItem* headers; // offset: 0x0
+    size_t count;            // offset: 0x8
 } HttpHeaders;
 
 typedef struct {
-    char* body;
-    uint16_t status;
-    char* content_type;
-    HttpHeaders* headers;
+    char* body;              // offset: 0x0
+    uint16_t status;         // offset: 0x8
+    // 6 bytes padding
+    char* content_type;      // offset: 0x10
+    HttpHeaders* headers;    // offset: 0x18
 } HttpResponse;
 
 /**
