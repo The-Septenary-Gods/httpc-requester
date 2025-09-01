@@ -12,7 +12,7 @@ Frida 测试部分需要以下两个环境：
 
 ``` Powershell
 pip install frida==16.4.10
-pip install frida-tools
+pip install frida-tools==13.7.1
 ```
 
 C 测试部分使用 TinyCC 编译器。Windows 系统下可以使用 Scoop 或 Chocolatey 安装。这里以 Scoop 为例：

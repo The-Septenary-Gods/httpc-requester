@@ -1,0 +1,112 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - master
+      - 'wip-*'
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache cargo registry and target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build (debug artifacts for tests)
+        run: cargo build --locked
+
+      - name: Upload debug artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: target-debug
+          path: target/debug
+
+  test-frida:
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/pip/cache
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Python deps
+        run: pip install frida==16.4.10 frida-tools==13.7.1
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: target-debug
+          path: target/debug
+
+      - name: Run Frida tests (retry up to 3 times)
+        shell: pwsh
+        run: |
+          $maxRetries = 3
+          $attempt = 0
+          do {
+            $attempt++
+            Write-Host "Running Frida test (attempt $attempt/$maxRetries)..."
+            pwsh tests/frida/run-test.ps1
+            $exitCode = $LASTEXITCODE
+            if ($exitCode -eq 0) {
+              exit 0
+            }
+          } while ($attempt -lt $maxRetries)
+
+          Write-Error "Frida tests failed after $maxRetries attempts"
+          exit 1
+
+  test-c:
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install TinyCC
+        run: choco install -y tinycc
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v5
+        with:
+          name: target-debug
+          path: target/debug
+
+      - name: Run C tests (retry up to 3 times)
+        shell: pwsh
+        run: |
+          $maxRetries = 3
+          $attempt = 0
+          do {
+            $attempt++
+            Write-Host "Running C test (attempt $attempt/$maxRetries)..."
+            tcc -run tests/tinycc/example-sites.c
+            $exitCode = $LASTEXITCODE
+            if ($exitCode -eq 0) {
+              exit 0
+            }
+          } while ($attempt -lt $maxRetries)
+
+          Write-Error "C tests failed after $maxRetries attempts"
+          exit 1
