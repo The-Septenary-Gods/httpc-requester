@@ -1,14 +1,15 @@
 /**
  * HTTP客户端 C 接口
- * 
+ *
  * 使用说明：
  * 1. 调用 httpc 方法发送 HTTP 请求
- * 2. 返回的 JSON 字符串需要使用 httpc_free 释放内存
- * 
+ * 2. 返回的 HttpResponse* 需要使用 httpc_free 释放内存（包含内部字段）
+ *
  * 支持的HTTP方法：GET, DELETE, HEAD, OPTIONS
  */
 
 #include <stdint.h>
+#include <stddef.h>
 
 typedef struct {
     char* key;
@@ -29,21 +30,14 @@ typedef struct {
 
 /**
  * 发送HTTP请求
- * 
+ *
  * @param method HTTP 方法字符串（如 "GET"）
  * @param url 请求的 URL 地址
- * @return 返回 JSON 格式的响应字符串，包含以下字段：
- *         - status: HTTP 状态码
- *         - content_type: 响应内容类型
- *         - body: 响应体内容
- *         - error: 错误信息（如果发生错误）
- *         调用者必须使用 httpc_free 释放返回的字符串
+ * @return 返回指向 HttpResponse 的指针（需要调用 httpc_free 释放）
  */
-HttpResponse httpc(char* method, char* url);
+HttpResponse* httpc(const char* method, const char* url);
 
 /**
- * 释放由 httpc 返回的对象
- * 
- * @param ptr 由 httpc 函数返回的字符串指针
+ * 释放由 httpc 返回的 HttpResponse 以及其内部字段。
  */
-void httpc_free(char* HttpResponse);
+void httpc_free(HttpResponse* resp);
