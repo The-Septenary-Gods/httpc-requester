@@ -27,19 +27,19 @@ declare namespace Httpc {
         add(offset: 0x08): size_t;
     }
 
-    type CHttpHeaderItem = Pointer<ReadonlyUtf8String> & {
+    type CHttpHeaderItem = TArrayAllocator<Pointer<ReadonlyUtf8String>> & {
         /** char* key (size=0x8) */
         add(offset: 0x00): Pointer<ReadonlyUtf8String>;
         /** char* value (size=0x8) */
         add(offset: 0x08): Pointer<ReadonlyUtf8String>;
     }
 
-    declare function func_request(
+    function func_request(
         method: Utf8String,
         url: Utf8String,
-        headers: CHttpHeaders,
-        body: Utf8String
+        headers: CHttpHeaders | NULL,
+        body: Utf8String | NULL,
     ): CHttpResponse;
 
-    declare function func_freeResponse(resp: Pointer<CHttpResponse>): void;
+    function func_freeResponse(resp: CHttpResponse): void;
 }

@@ -6,6 +6,41 @@
  */
 declare function hexdump(target: ArrayBuffer | NativePointerValue, options?: HexdumpOptions): string;
 
+/** The **`console`** object provides access to the debugging console (e.g., the Web console in Firefox). */
+/**
+ * The **`console`** object provides access to the debugging console (e.g., the Web console in Firefox).
+ *
+ * [MDN Reference](https://developer.mozilla.org/docs/Web/API/console)
+ */
+interface Console {
+    /**
+     * The **`console.error()`** static method outputs a message to the console at the 'error' log level.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/console/error_static)
+     */
+    error(...data: any[]): void;
+    /**
+     * The **`console.log()`** static method outputs a message to the console.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/console/log_static)
+     */
+    log(...data: any[]): void;
+    /**
+     * The **`console.warn()`** static method outputs a warning message to the console at the 'warning' log level.
+     *
+     * [MDN Reference](https://developer.mozilla.org/docs/Web/API/console/warn_static)
+     */
+    warn(...data: any[]): void;
+}
+
+/** The **`console`** object provides access to the debugging console (e.g., the Web console in Firefox). */
+/**
+ * The **`console`** object provides access to the debugging console (e.g., the Web console in Firefox).
+ *
+ * [MDN Reference](https://developer.mozilla.org/docs/Web/API/console)
+ */
+declare const console: Console;
+
 interface HexdumpOptions {
     /**
      * Specifies base address of data being dumped. Defaults to the address of

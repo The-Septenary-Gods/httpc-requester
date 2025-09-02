@@ -13,11 +13,11 @@ const colors = {
 };
 
 class Httpc {
-    /** @type {Module} */
+    /** @ts-ignore @type {Module} */
     #Module;
-    /** @type {Httpc.func_request} */
+    /** @ts-ignore @type {Httpc.func_request} */
     #Func_Request;
-    /** @type {Httpc.func_freeResponse} */
+    /** @ts-ignore @type {Httpc.func_freeResponse} */
     #Func_FreeResponse;
     /** @type {string | undefined} */
     constructError;
@@ -31,7 +31,8 @@ class Httpc {
         try {
             this.#Module = Module.load(modulePath);
         } catch (e) {
-            this.constructError = `Module.load failed for "${modulePath}": ${e.message}`;
+            const msg = e instanceof Error ? e.message : e;
+            this.constructError = `Module.load failed for "${modulePath}": ${msg}`;
             return;
         }
 
@@ -39,14 +40,14 @@ class Httpc {
         if (reqPtr === null || reqPtr.isNull()) {
             this.constructError = 'Export "httpc" not found in module: ' + modulePath;
             return;
-        }
+        } // @ts-expect-error
         this.#Func_Request = new NativeFunction(reqPtr, 'pointer', ['pointer','pointer','pointer','pointer']);
 
         const freePtr = this.#Module.findExportByName('httpc_free');
         if (freePtr === null || freePtr.isNull()) {
             this.constructError = 'Export "httpc_free" not found in module: ' + modulePath;
             return;
-        }
+        } // @ts-expect-error
         this.#Func_FreeResponse = new NativeFunction(freePtr, 'void', ['pointer']);
     }
 
@@ -57,8 +58,8 @@ class Httpc {
      *
      * @param {string} method - HTTP 方法，如 'GET', 'POST'
      * @param {string} url - 请求的 URL，可以包括 Basic Auth 用户名、密码
-     * @param {Map<string, string> | NativePointer} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
-     * @param {string | NativePointer} [body] - 可选的请求体字符串，或指向 C 字符串的指针
+     * @param {Map<string, string> | Httpc.CHttpHeaders} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
+     * @param {string | Utf8String} [body] - 可选的请求体字符串，或指向 C 字符串的指针
      * @returns {Httpc.HttpResponse | null}
      */
     request(method, url, headers, body) {
@@ -84,9 +85,9 @@ class Httpc {
      * 从参数构造请求所需的 NativeFunction 参数
      * @param {string} method - HTTP 方法，如 'GET', 'POST'
      * @param {string} url - 请求的 URL，可以包括 Basic Auth 用户名、密码
-     * @param {Map<string, string> | NativePointer} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
-     * @param {string | NativePointer} [body] - 可选的请求体字符串，或指向 C 字符串的指针
-     * @returns {ConstructorParameters<typeof Httpc.func_request>}
+     * @param {Map<string, string> | Httpc.CHttpHeaders} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
+     * @param {string | Utf8String} [body] - 可选的请求体字符串，或指向 C 字符串的指针
+     * @returns {Parameters<typeof Httpc.func_request>}
      */
     #getRequestParams(method, url, headers, body) {
         /** @type {Utf8String} */
@@ -95,7 +96,7 @@ class Httpc {
         /** @type {Utf8String} */
         const urlBuf = Memory.allocUtf8String(url);
 
-        /** @type {Httpc.CHttpHeaders} */
+        /** @type {Httpc.CHttpHeaders | NULL} */
         const headersPtr = headers instanceof Map ?
             this.#allocHeaders(headers) : // 如果传入 Map，转换为 CHttpHeaders 指针
             headers instanceof NativePointer ?
@@ -162,14 +163,15 @@ class Httpc {
     /**
      * 为 C 层分配并写入 HttpHeaders 结构体（只在本次调用期间有效）
      * @param {Map<string,string>} headers
-     * @returns {NativePointer} 指向 HttpHeaders 的指针
+     * @returns {Httpc.CHttpHeaders | NULL} 指向 HttpHeaders 的指针
      */
     #allocHeaders(headers) {
-        const count = headers.size >>> 0;
+        const count = headers.size;
         if (count === 0) return ptr(0);
 
         // 分配 items 数组（每个 item: 2 个指针，共 0x10 bytes on 64-bit）
         const itemSize = Process.pointerSize * 2;
+        /** @ts-expect-error @type {TArrayAllocator<Pointer<ReadonlyUtf8String>>} */
         const itemsBuf = Memory.alloc(itemSize * count);
         const stringAllocs = []; // Keep references here to prevent GC
 
@@ -181,6 +183,7 @@ class Httpc {
             const valPtr = Memory.allocUtf8String(v);
             stringAllocs.push(valPtr);
 
+            /** @ts-expect-error @type {Httpc.CHttpHeaderItem} */
             const base = itemsBuf.add(i * itemSize);
             base.writePointer(keyPtr);
             base.add(Process.pointerSize).writePointer(valPtr);
@@ -188,14 +191,14 @@ class Httpc {
         }
 
         // 分配 HttpHeaders 结构体：items 指针 + size_t 计数
+        /** @ts-expect-error @type {Httpc.CHttpHeaders} */
         const hdrs = Memory.alloc(Process.pointerSize + Process.pointerSize);
         hdrs.writePointer(itemsBuf);
-        // size_t 假设使用 64 位（我们的 @types 里 size_t 是 64 位）
+        // @ts-expect-error size_t 假设使用 64 位（我们的 @types 里 size_t 是 64 位）
         hdrs.add(Process.pointerSize).writeU64(count);
 
-        // HACK: Attach allocations to the returned pointer to prevent premature GC
-        hdrs.itemsBuf = itemsBuf;
-        hdrs.stringAllocs = stringAllocs;
+        // @ts-expect-error HACK: Attach allocations to the returned pointer to prevent premature GC
+        hdrs.itemsBuf = itemsBuf, hdrs.stringAllocs = stringAllocs;
 
         return hdrs;
     }
@@ -266,6 +269,7 @@ function runTest(httpc, test, index) {
 }
 
 rpc.exports = {
+    // @ts-ignore
     init(stage, parameters) { // 测试入口
         g_repoPath = parameters.repoPath;
         const httpc = new Httpc(parameters.modulePath);
@@ -304,7 +308,7 @@ rpc.exports = {
                 title: 'httpbin.org Chinese qs',
                 method: 'GET',
                 url: 'https://httpbin.org/get?from=TSG%20%E5%8A%A8%E6%80%81%20HTTP(S)%20%E5%BA%93%E6%B5%8B%E8%AF%95',
-                buildHeaders: () => new Map([
+                headers: new Map([
                     ['Accept', 'application/json'],
                 ]),
                 expected_status: 200,
@@ -314,10 +318,10 @@ rpc.exports = {
                 title: 'httpbin.org POST json',
                 method: 'POST',
                 url: 'https://httpbin.org/post',
-                buildHeaders: [
+                headers: new Map([
                     ['Accept', 'application/json'],
                     ['Content-Type', 'application/json'],
-                ],
+                ]),
                 body: '[{"我是谁": 5429}, 0x624995738]',
                 expected_status: 200,
                 expected_body_substr: '"data": "[{\\"\\u6211\\u662f\\u8c01\\": 5429}, 0x624995738]"',

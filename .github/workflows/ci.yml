@@ -5,6 +5,9 @@ on:
     branches-ignore:
       - master
       - 'wip-*'
+    paths-ignore:
+      - '**.md'
+      - '.gitignore'
   pull_request:
 
 jobs:
@@ -34,9 +37,33 @@ jobs:
           name: target-debug
           path: target/debug
 
+  check-jsdoc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Cache Node.js modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install tsc globally
+        run: npm install -g typescript
+
+      - name: Run JSDoc checks
+        run: tsc --noEmit
+
   test-frida:
     runs-on: windows-latest
-    needs: build
+    needs:
+      - build
+      - check-jsdoc
     steps:
       - uses: actions/checkout@v5
 
@@ -83,6 +110,12 @@ jobs:
     needs: build
     steps:
       - uses: actions/checkout@v5
+
+      - name: Cache Chocolatey
+        uses: actions/cache@v4
+        with:
+          path: ~/AppData/Local/Temp/chocolatey
+          key: ${{ runner.os }}-choco-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install TinyCC
         run: choco install -y tinycc
