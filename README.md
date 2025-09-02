@@ -1,3 +1,78 @@
+# HTTP(S) 客户端动态库
+
+**中文文档** | [English Document](README-en.md)
+
+**HTTP(S) 客户端动态库** 是一个使用 Rust 编写的库，可以构建为动态链接库 `.dll`，并通过 Frida 或其他支持 C ABI 的语言或框架调用。
+
+它支持常见的 HTTP 方法 `GET / DELETE / HEAD / OPTIONS / POST / PUT / PATCH`，并允许自定义请求头 `headers` 和请求体 `body`。
+
+本项目有大量代码由人工智能编写或辅助编写。
+
+## 构建
+
+构建这一项目除了 Rust 工具链以外，没有其他依赖项。
+
+本项目使用 Rust 2024 标准，因此最低构建版本为 1.85.0。
+
+和绝大多数 Rust 项目一样，本项目可以直接用 `cargo build` 构建。
+
+``` Powershell
+cargo build            # 开发版本
+cargo build --release  # 发布版本
+```
+
+> 本项目为 Windows amd64 平台开发，并在这一平台上测试。理论上支持其他 64 位平台，但未经测试，兼容性无法保证。
+>
+> 在 32 位平台上构建这一项目可能不存在问题，但测试代码中多处硬编码了指针大小为 64 位，因此在 32 位平台上运行测试代码时会失败。
+
+## 使用
+
+### Frida 使用
+
+我们为 Frida 写了一个 wrapper，可以直接将 [`tests/frida/example-sites.js`](tests/frida/example-sites.js) 中的 `Httpc` 类引入你的工程中。
+
+由于 Frida 没有模块功能，如果你没有用 webpack 或 ncc 等打包工具，那么引入这个类的最简单方法是直接将 `Httpc` 的代码复制到你的脚本中。
+
+然后就可以使用这个模块了，就像这样：
+
+``` JavaScript
+const httpc = new Httpc(modulePath); // modulePath 为 .dll 文件的位置
+if (httpc.constructError) { // constructError 通常是因为找不到库，或无法加载符号
+    throw new Error(httpc.constructError);
+}
+
+const response = httpc.request('GET', 'https://example.com');
+if (!response) {
+    throw new Error('No response');
+} else if (response.status === 0xFFFF) { // 用 0xFFFF 来表示库的报错，包括连接超时等问题
+    throw new Error('Httpc dylib throwed error: ' + response.body);
+}
+
+console.log(response);
+```
+
+> 我们在 Frida v16.4.10 环境下测试我们的模块和 wrapper，因此在这个版本下是预期可用的。
+>
+> 我们也努力实现向前兼容性，在最新版的 Frida 中正常工作。
+>
+> 但在更早的版本中，可能会因为 Frida 缺失一些 JS API，或 QuickJS 引擎过旧而无法使用。
+
+如果你愿意的话，可以在 `Httpc` 所在脚本的头部引入类型定义文件，这样可以让编辑器更好地为你提供类型提示，甚至让 tsc 为你做类型检查。
+
+``` JavaScript
+/// <reference path='../../@types/frida.d.ts' />
+/// <reference path='../../@types/httpc.d.ts' />
+```
+
+你需要修改路径，让他们正确地指向你的 `*.d.ts` 文件。
+
+
+### 其他语言通过 C ABI 调用
+
+其他语言也可以通过 C ABI 调用这个库，例子如 [`tests/tinycc/example-sites.c`](tests/tinycc/example-sites.c)。
+
+你可以在 [`includes/httpc.h`](includes/httpc.h) 中找到相关的函数声明和数据结构定义。
+
 ## 测试
 
 测试始终应当在 Windows amd64 平台上进行。
