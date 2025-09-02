@@ -54,9 +54,15 @@ fn make_error_response(msg: &str) -> *mut HttpResponse {
     Box::into_raw(resp)
 }
 
-/// C ABI: httpc(method, url) -> HttpResponse*. Caller must call httpc_free to free.
+/// C ABI: httpc(method, url, headers, body) -> HttpResponse*
+/// 调用者必须调用 httpc_free 释放返回的指针。
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn httpc(method: *const c_char, url: *const c_char) -> *mut HttpResponse {
+pub unsafe extern "C" fn httpc(
+    method: *const c_char,
+    url: *const c_char,
+    headers: *const HttpHeaders,
+    body: *const c_char,
+) -> *mut HttpResponse {
     // 参数校验
     if method.is_null() || url.is_null() {
         return make_error_response("null pointer argument");
@@ -76,20 +82,69 @@ pub unsafe extern "C" fn httpc(method: *const c_char, url: *const c_char) -> *mu
     };
 
     let agent = get_agent();
-    // 构造请求
-    // 已知问题：现在这里没有处理 body 和 headers，所以带 body 的方法暂不可用
-    let req = match method.to_uppercase().as_str() {
-        "GET" => agent.get(url),
-        // "POST" => agent.post(url),
-        // "PUT" => agent.put(url),
-        "DELETE" => agent.delete(url),
-        // "PATCH" => agent.patch(url),
-        "HEAD" => agent.head(url),
-        "OPTIONS" => agent.options(url),
+    // 标准化方法字符串：去除首尾空白，并使用不区分大小写比较
+    let method_norm = method.trim();
+
+    // 工具函数：将 C 传入的 headers 应用到请求上
+    // 注意：Header 的 key 按原样传入，不做大小写转换
+    fn apply_headers<B>(mut rb: ureq::RequestBuilder<B>, headers_ptr: *const HttpHeaders) -> ureq::RequestBuilder<B> {
+        if !headers_ptr.is_null() {
+            // 安全：仅读取传入内存
+            let hdrs = unsafe { &*headers_ptr };
+            if !hdrs.headers.is_null() && hdrs.count > 0 {
+                let items = unsafe { std::slice::from_raw_parts(hdrs.headers, hdrs.count) };
+                for item in items.iter() {
+                    if item.key.is_null() || item.value.is_null() { continue; }
+                    let key = match unsafe { CStr::from_ptr(item.key) }.to_str() { Ok(s) => s, Err(_) => continue };
+                    let val = match unsafe { CStr::from_ptr(item.value) }.to_str() { Ok(s) => s, Err(_) => continue };
+                    rb = rb.header(key, val);
+                }
+            }
+        }
+        rb
+    }
+
+    let resp = match () {
+        // 无请求体的方法
+        _ if method_norm.eq_ignore_ascii_case("GET") => {
+            let rb = apply_headers(agent.get(url), headers);
+            rb.call()
+        }
+        _ if method_norm.eq_ignore_ascii_case("DELETE") => {
+            let rb = apply_headers(agent.delete(url), headers);
+            rb.call()
+        }
+        _ if method_norm.eq_ignore_ascii_case("HEAD") => {
+            let rb = apply_headers(agent.head(url), headers);
+            rb.call()
+        }
+        _ if method_norm.eq_ignore_ascii_case("OPTIONS") => {
+            let rb = apply_headers(agent.options(url), headers);
+            rb.call()
+        }
+        // 需要请求体的方法
+        _ if method_norm.eq_ignore_ascii_case("POST") => {
+            if body.is_null() { return make_error_response("POST requires body"); }
+            let body_str = match unsafe { CStr::from_ptr(body) }.to_str() { Ok(s) => s, Err(_) => return make_error_response("invalid utf-8 in body") };
+            let rb = apply_headers(agent.post(url), headers);
+            rb.send(body_str)
+        }
+        _ if method_norm.eq_ignore_ascii_case("PUT") => {
+            if body.is_null() { return make_error_response("PUT requires body"); }
+            let body_str = match unsafe { CStr::from_ptr(body) }.to_str() { Ok(s) => s, Err(_) => return make_error_response("invalid utf-8 in body") };
+            let rb = apply_headers(agent.put(url), headers);
+            rb.send(body_str)
+        }
+        _ if method_norm.eq_ignore_ascii_case("PATCH") => {
+            if body.is_null() { return make_error_response("PATCH requires body"); }
+            let body_str = match unsafe { CStr::from_ptr(body) }.to_str() { Ok(s) => s, Err(_) => return make_error_response("invalid utf-8 in body") };
+            let rb = apply_headers(agent.patch(url), headers);
+            rb.send(body_str)
+        }
         _ => return make_error_response("unsupported HTTP method"),
     };
 
-    let mut resp = match req.call() {
+    let mut resp = match resp {
         Ok(r) => r,
         Err(e) => return make_error_response(&format!("request error: {e}")),
     };

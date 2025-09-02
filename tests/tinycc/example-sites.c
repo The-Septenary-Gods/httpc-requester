@@ -30,19 +30,88 @@ int main() {
 
     // 发送 GET 请求
     // 以下为测试框架：便于以后添加多个测试。输出使用英文，注释保持中文。
-    typedef struct {
-        const char* title;
-        const char* method;
-        const char* url;
-        unsigned expected_status;
-        const char* expected_body_substr; /* nullable: if non-null, body must contain this */
-    } Test;
 
     Test tests[] = {
-        { "example.com GET",        "GET", "https://example.com",            200, "Example Domain" },
-        { "httpbin.org 404",        "GET", "https://httpbin.org/status/404", 404, NULL             },
-        { "httpbin.org 418 teapot", "GET", "https://httpbin.org/status/418", 418, "teapot"         },
-        { "httpbin.org 503",        "GET", "https://httpbin.org/status/503", 503, NULL             },
+        {
+            "example.com GET",
+            "GET",
+            "https://example.com",
+            200,
+            "Example Domain",
+            NULL,
+            0,
+        },
+        {
+            "httpbin.org 404",
+            "GET",
+            "https://httpbin.org/status/404",
+            404,
+            NULL,
+            NULL,
+            0,
+        },
+        {
+            "httpbin.org 418 teapot",
+            "GET",
+            "https://httpbin.org/status/418",
+            418, "teapot",
+            NULL,
+            0,
+        },
+        {
+            "httpbin.org 503",
+            "GET",
+            "https://httpbin.org/status/503",
+            503,
+            NULL,
+            NULL,
+            0,
+        },
+        {
+            "httpbin.org Chinese qs",
+            "GET",
+            "https://httpbin.org/get?from=TSG%20%E5%8A%A8%E6%80%81%20HTTP(S)%20%E5%BA%93%E6%B5%8B%E8%AF%95",
+            200,
+            "\"from\": \"TSG \\u52a8\\u6001 HTTP(S) \\u5e93\\u6d4b\\u8bd5\"",
+            NULL,
+            0,
+        },
+        {
+            "httpbin.org POST json",
+            "POST",
+            "https://httpbin.org/post",
+            200,
+            "\"data\": \"[{\\\"\\u6211\\u662f\\u8c01\\\": 5429}, 0x624995738]\"",
+            "[{\"我是谁\": 5429}, 0x624995738]",
+            1,
+        },
+        {
+            "httpbin.org Bearer",
+            "GET",
+            "https://httpbin.org/bearer",
+            200,
+            "\"token\": \"TSG_TOKEN\"",
+            NULL,
+            1,
+        },
+        {
+            "httpbin.org BasicAuth",
+            "GET",
+            "https://TSG:TSG-pass@httpbin.org/basic-auth/TSG/TSG-pass",
+            200,
+            "\"user\": \"TSG\"",
+            NULL,
+            1,
+        },
+        {
+            "httpbin.org BasicAuth fail",
+            "GET",
+            "https://TSG:TSG-PASS@httpbin.org/basic-auth/TSG/TSG-pass",
+            401,
+            NULL,
+            NULL,
+            1,
+        },
     };
 
     int ntests = sizeof(tests) / sizeof(tests[0]);
@@ -52,7 +121,45 @@ int main() {
         Test *t = &tests[i];
         printf("Running test %d: ", i + 1, t->title);
 
-        HttpResponse* response = p_httpc(t->method, t->url);
+        /* 针对需要自定义 headers 的用例，构建 HttpHeaders */
+        HttpHeaders* hdrs_ptr = NULL;
+        HttpHeaders hdrs = {0};
+        HttpHeaderItem items[4];
+        char* kbuf[4] = {0};
+        char* vbuf[4] = {0};
+        size_t nitems = 0;
+
+        if (t->with_headers) {
+            /* 通用：指定 Accept: application/json */
+            kbuf[nitems] = _strdup("Accept");
+            vbuf[nitems] = _strdup("application/json");
+            items[nitems].key = kbuf[nitems];
+            items[nitems].value = vbuf[nitems];
+            nitems++;
+
+            if (strcmp(t->title, "httpbin.org POST json") == 0) {
+                kbuf[nitems] = _strdup("Content-Type");
+                vbuf[nitems] = _strdup("application/json");
+                items[nitems].key = kbuf[nitems];
+                items[nitems].value = vbuf[nitems];
+                nitems++;
+            } else if (strcmp(t->title, "httpbin.org Bearer") == 0) {
+                kbuf[nitems] = _strdup("Authorization");
+                vbuf[nitems] = _strdup("Bearer TSG_TOKEN");
+                items[nitems].key = kbuf[nitems];
+                items[nitems].value = vbuf[nitems];
+                nitems++;
+            }
+
+            if (nitems > 0) {
+                hdrs.headers = items;
+                hdrs.count = nitems;
+                hdrs_ptr = &hdrs;
+            }
+        }
+
+        const char* body = t->body;
+        HttpResponse* response = p_httpc(t->method, t->url, hdrs_ptr, body);
         int ok = 1;
 
         if (!response) {
@@ -102,6 +209,12 @@ int main() {
             printf("%s[PASS] %s%s\n", CONSOLE_GREEN, t->title, CONSOLE_RESET);
         } else {
             printf("\n");
+        }
+
+        /* 释放 headers 临时分配的内存 */
+        for (size_t j = 0; j < nitems; ++j) {
+            if (kbuf[j]) free(kbuf[j]);
+            if (vbuf[j]) free(vbuf[j]);
         }
     }
 

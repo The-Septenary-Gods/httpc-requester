@@ -19,6 +19,10 @@ interface ReadonlyUtf8String {
     readUtf8String: NativePointer['readUtf8String'];
 }
 
+interface Utf8String extends ReadonlyUtf8String {
+    writeUtf8String: (value: string) => Utf8String;
+}
+
 /** (size=0x8) */
 interface Pointer<T> {
     readPointer(): T;
