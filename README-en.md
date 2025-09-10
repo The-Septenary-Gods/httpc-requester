@@ -1,8 +1,8 @@
-# HTTPC - HTTP(S) Client Dynamic Library
+# HTTPC Requester - HTTP(S) Client Dynamic Library
 
 [中文文档](README.md) | **English Document**
 
-**HTTPC** is a library written in Rust that can be built as a dynamic link library (`.dll`). It provides a C-ABI interface for making HTTP(S) requests, and can be called via Frida or any other language or framework that supports the C ABI.
+**HTTPC Requester** is a library written in Rust that can be built as a dynamic link library (`.dll`). It provides a C-ABI interface for making HTTP(S) requests, and can be called via Frida or any other language or framework that supports the C ABI.
 
 It supports common HTTP methods: `GET`, `DELETE`, `HEAD`, `OPTIONS`, `POST`, `PUT`, and `PATCH`,
 and allows customization of request headers (`headers`) and request body (`body`).
@@ -160,3 +160,10 @@ Run the Frida tests:
 ```powershell
 pwsh tests/frida/run-test.ps1
 ```
+## License
+
+This project is open-sourced under the [Apache-2.0 License](https://www.apache.org/licenses/LICENSE-2.0).
+
+Notably, if you modify the code of this project, you must comply with the following terms of the Apache-2.0 License:
+- Clearly indicate the modifications you have made.
+- Without permission, you may not use the original author's name, trademarks, or branding to promote your modified version, nor imply any endorsement or approval of your changes by the original author in any way.

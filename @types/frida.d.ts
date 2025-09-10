@@ -1,3 +1,19 @@
+/* *********************************************************************
+ * Type definitions for Frida Gum.js (https://frida.re).
+ *
+ * Original from:
+ *   https://github.com/DefinitelyTyped/DefinitelyTyped/blob/5d31fd4b0d304375127c1277aa28b6008cf5072a/types/frida-gum/index.d.ts
+ * Owners: Ole André Vadla Ravnås, Francesco Tamagni, Håvard Sørbø
+ * Licensed under the MIT License:
+ *   https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/LICENSE
+ *
+ * We've modified the original definition by adding the definition of
+ * the Console interface and global console variable.
+ *
+ * Included in HTTPC (https://github.com/The-Septenary-Gods/httpc-requester)
+ * HTTPC is licensed under the Apache License, Version 2.0.
+ * ********************************************************************* */
+
 /**
  * Returns a hexdump of the provided ArrayBuffer or NativePointerValue target.
  *

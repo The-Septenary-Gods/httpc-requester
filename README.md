@@ -1,8 +1,8 @@
-# HTTPC - HTTP(S) 客户端动态库
+# HTTPC 请求器 - HTTP(S) 客户端动态库
 
 **中文文档** | [English Document](README-en.md)
 
-**HTTPC** 是一个使用 Rust 编写的库，可以构建为动态链接库 `.dll`。它提供了 C-ABI 的接口来完成 HTTP(S) 请求，可以通过 Frida 或其他支持 C ABI 的语言或框架调用。
+**HTTPC 请求器** 是一个使用 Rust 编写的库，可以构建为动态链接库 `.dll`。它提供了 C-ABI 的接口来完成 HTTP(S) 请求，可以通过 Frida 或其他支持 C ABI 的语言或框架调用。
 
 它支持常见的 HTTP 方法 `GET / DELETE / HEAD / OPTIONS / POST / PUT / PATCH`，并允许自定义请求头 `headers` 和请求体 `body`。
 
@@ -156,3 +156,11 @@ pip install frida-tools==13.7.1
 ``` Powershell
 pwsh tests/frida/run-test.ps1
 ```
+
+## 许可证
+
+本项目根据 [Apache-2.0 许可证](https://www.apache.org/licenses/LICENSE-2.0)开放源代码。
+
+值得注意的是，如果您对本项目的代码进行了修改，您必须遵守以下 Apache-2.0 许可证条款：
+- 明确注明您所做的修改。
+- 未经许可，您不得利用原作者的名称、商标或标识来宣传您的修改版本，或以任何方式暗示原作者对您修改的代码表示认可或背书。
