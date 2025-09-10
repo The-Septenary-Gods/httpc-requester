@@ -35,7 +35,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: target-debug
-          path: target/debug
+          path: target/debug/tsg_httpc.dll
 
   check-jsdoc:
     runs-on: ubuntu-latest
@@ -89,6 +89,8 @@ jobs:
 
       - name: Run Frida tests (retry up to 3 times)
         shell: pwsh
+        env:
+          HTTPBIN_ENDPOINT: ${{ vars.HTTPBIN_ENDPOINT }}
         run: |
           $maxRetries = 3
           $attempt = 0
@@ -103,7 +105,7 @@ jobs:
           } while ($attempt -lt $maxRetries)
 
           Write-Error "Frida tests failed after $maxRetries attempts"
-          exit 1
+          exit $LASTEXITCODE
 
   test-c:
     runs-on: windows-latest
@@ -128,6 +130,8 @@ jobs:
 
       - name: Run C tests (retry up to 3 times)
         shell: pwsh
+        env:
+          HTTPBIN_ENDPOINT: ${{ vars.HTTPBIN_ENDPOINT }}
         run: |
           $maxRetries = 3
           $attempt = 0
@@ -142,4 +146,4 @@ jobs:
           } while ($attempt -lt $maxRetries)
 
           Write-Error "C tests failed after $maxRetries attempts"
-          exit 1
+          exit $LASTEXITCODE

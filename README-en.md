@@ -107,6 +107,9 @@ Then, set the `HTTPBIN_ENDPOINT` environment variable to let the test program us
 ```powershell
 $env:HTTPBIN_ENDPOINT = "https://your-custom-httpbin.org" # Replace with your endpoint
 ```
+When running CI via GitHub Actions or similar workflows, it is also possible and recommended to set the `HTTPBIN_ENDPOINT` environment variable to customize the httpbin endpoint.
+
+To set this variable in GitHub Actions, refer to [this guide](https://docs.github.com/en/actions/learn-github-actions/variables#creating-configuration-variables-for-a-repository). Add a repository variable with the key `HTTPBIN_ENDPOINT` and set its value to your desired endpoint.
 
 ### JSDoc Checking
 

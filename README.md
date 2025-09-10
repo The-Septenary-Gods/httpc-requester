@@ -102,6 +102,10 @@ docker run -p 80:80 kennethreitz/httpbin
 $env:HTTPBIN_ENDPOINT = "https://your-custom-httpbin.org" # 替换为你的 endpoint
 ```
 
+通过 Github Actions 或类似工作流进行 CI 时，同样可以且建议设置 `HTTPBIN_ENDPOINT` 环境变量来自定义 httpbin endpoint。
+
+在 Github Actions 中设置变量可以参考[这篇指南](https://docs.github.com/zh/actions/how-tos/write-workflows/choose-what-workflows-do/use-variables#creating-configuration-variables-for-a-repository)，添加一个键名为 `HTTPBIN_ENDPOINT`，值为你的 endpoint 的存储库变量即可。
+
 ### JSDoc 检查
 
 第一次运行 JSDoc 检查前，需要确保已安装 Node.js（或 Bun, Deno，下略）和 tsc。
