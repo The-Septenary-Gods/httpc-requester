@@ -33,11 +33,14 @@ pub struct HttpResponse {
 /// 工具函数：获取全局的 ureq::Agent 实例，并进行配置
 fn get_agent() -> &'static ureq::Agent {
     AGENT.get_or_init(|| {
+        // 从 Cargo.toml 获取版本号，用于 User-Agent 头
+        let version = env!("CARGO_PKG_VERSION");
+
         // 全局配置：不把 4xx/5xx 当作 Error（这样可以拿到响应 body），设置全局 timeout
         let config = ureq::Agent::config_builder()
             .http_status_as_error(false)
             .timeout_global(Some(Duration::from_secs(30)))
-            .user_agent("TSG-httpc/0.1")
+            .user_agent(format!("HTTPC/{version}"))
             .build();
         ureq::Agent::new_with_config(config)
     })

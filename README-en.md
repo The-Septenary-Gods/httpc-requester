@@ -1,9 +1,8 @@
-# HTTP(S) Client Dynamic Library
+# HTTPC - HTTP(S) Client Dynamic Library
 
 [中文文档](README.md) | **English Document**
 
-The **HTTP(S) Client Dynamic Library** is a library written in Rust that can be built as a
-dynamic link library (`.dll`) and called via Frida or other languages/frameworks that support the C ABI.
+**HTTPC** is a library written in Rust that can be built as a dynamic link library (`.dll`). It provides a C-ABI interface for making HTTP(S) requests, and can be called via Frida or any other language or framework that supports the C ABI.
 
 It supports common HTTP methods: `GET`, `DELETE`, `HEAD`, `OPTIONS`, `POST`, `PUT`, and `PATCH`,
 and allows customization of request headers (`headers`) and request body (`body`).

@@ -3,7 +3,7 @@ $currentDir = Get-Location
 
 # 构建目标 DLL 的路径
 $repoPath = $currentDir
-$modulePath = Join-Path -Path $currentDir -ChildPath "target\debug\tsg_httpc.dll"
+$modulePath = Join-Path -Path $currentDir -ChildPath "target\debug\httpc.dll"
 
 # 确保路径使用 Windows 风格的反斜杠并转义
 $repoPath = $currentDir -replace '\\', '\\'

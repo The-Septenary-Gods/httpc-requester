@@ -1,8 +1,8 @@
-# HTTP(S) 客户端动态库
+# HTTPC - HTTP(S) 客户端动态库
 
 **中文文档** | [English Document](README-en.md)
 
-**HTTP(S) 客户端动态库** 是一个使用 Rust 编写的库，可以构建为动态链接库 `.dll`，并通过 Frida 或其他支持 C ABI 的语言或框架调用。
+**HTTPC** 是一个使用 Rust 编写的库，可以构建为动态链接库 `.dll`。它提供了 C-ABI 的接口来完成 HTTP(S) 请求，可以通过 Frida 或其他支持 C ABI 的语言或框架调用。
 
 它支持常见的 HTTP 方法 `GET / DELETE / HEAD / OPTIONS / POST / PUT / PATCH`，并允许自定义请求头 `headers` 和请求体 `body`。
 

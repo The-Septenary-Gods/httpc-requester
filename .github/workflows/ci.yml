@@ -35,7 +35,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: target-debug
-          path: target/debug/tsg_httpc.dll
+          path: target/debug/httpc.dll
 
   check-jsdoc:
     runs-on: ubuntu-latest

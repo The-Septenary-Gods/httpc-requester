@@ -177,7 +177,7 @@ static void async_test_callback(HttpResponse* response, void* context) {
 }
 
 int main() {
-    HMODULE lib = LoadLibraryA("target\\debug\\tsg_httpc.dll");
+    HMODULE lib = LoadLibraryA("target\\debug\\httpc.dll");
     if (!lib) {
         printf("LoadLibrary failed, error=%lu\n", (unsigned long)GetLastError());
         return ERR_FAILED_TO_LOAD_LIBRARY;
