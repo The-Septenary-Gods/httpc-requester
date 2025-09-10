@@ -5,6 +5,9 @@
 /** @type {string?} */
 let g_repoPath = null;
 
+/** @type {string} */
+let g_httpbinEndpoint = 'https://httpbin.org';
+
 // 添加颜色常量
 const colors = {
     reset: '\x1b[0m',
@@ -12,13 +15,80 @@ const colors = {
     green: '\x1b[32m',
 };
 
+/**
+ * 设置 httpbin endpoint
+ * @param {string} endpoint - 新的 endpoint
+ */
+function setHttpbinEndpoint(endpoint) {
+    if (!endpoint || endpoint.trim() === '') {
+        g_httpbinEndpoint = 'https://httpbin.org';
+        return;
+    }
+
+    let normalizedEndpoint = endpoint.trim();
+
+    // 如果没有协议前缀，添加 http://
+    if (!normalizedEndpoint.startsWith('http://') && !normalizedEndpoint.startsWith('https://')) {
+        normalizedEndpoint = 'http://' + normalizedEndpoint;
+    }
+
+    // 移除末尾的斜杠
+    if (normalizedEndpoint.endsWith('/')) {
+        normalizedEndpoint = normalizedEndpoint.slice(0, -1);
+    }
+
+    g_httpbinEndpoint = normalizedEndpoint;
+}
+
+/**
+ * 获取完整的 httpbin URL
+ * @param {string} path - 路径，如 '/status/404'
+ * @returns {string}
+ */
+function getHttpbinUrl(path) {
+    const safePath = path || '';
+    const slash = safePath.startsWith('/') ? '' : '/';
+    return `${g_httpbinEndpoint}${slash}${safePath}`;
+}
+
+/**
+ * 获取带基础认证的完整 httpbin URL
+ * @param {string} username - 用户名
+ * @param {string} password - 密码
+ * @param {string} path - 路径
+ * @returns {string}
+ */
+function getHttpbinUrlWithBasicAuth(username, password, path) {
+    const safePath = path || '';
+    const slash = safePath.startsWith('/') ? '' : '/';
+
+    // 查找协议部分
+    const protocolMatch = g_httpbinEndpoint.match(/^(https?:\/\/)/);
+    if (!protocolMatch) {
+        throw new Error('Invalid endpoint format');
+    }
+
+    const protocol = protocolMatch[1];
+    const hostPart = g_httpbinEndpoint.substring(protocol.length);
+
+    return `${protocol}${username}:${password}@${hostPart}${slash}${safePath}`;
+}
+
 class Httpc {
     /** @ts-ignore @type {Module} */
     #Module;
     /** @ts-ignore @type {Httpc.func_request} */
     #Func_Request;
+    /** @ts-ignore @type {Httpc.func_requestAsync} */
+    #Func_RequestAsync;
     /** @ts-ignore @type {Httpc.func_freeResponse} */
     #Func_FreeResponse;
+    /**
+     * 由于保持异步请求中 callback 函数的引用，避免被 GC
+     * @type {Array<NativeCallback<'void', ['pointer', 'pointer']>>}
+     */
+    #activeCallbacks = [];
+
     /** @type {string | undefined} */
     constructError;
 
@@ -43,6 +113,17 @@ class Httpc {
         } // @ts-expect-error
         this.#Func_Request = new NativeFunction(reqPtr, 'pointer', ['pointer','pointer','pointer','pointer']);
 
+        const reqAsyncPtr = this.#Module.findExportByName('httpc_async');
+        if (reqAsyncPtr === null || reqAsyncPtr.isNull()) {
+            this.constructError = 'Export "httpc_async" not found in module: ' + modulePath;
+            return;
+        } // @ts-expect-error
+        this.#Func_RequestAsync = new NativeFunction(
+            reqAsyncPtr,
+            'void',
+            ['pointer','pointer','pointer','pointer','pointer','pointer'],
+        );
+
         const freePtr = this.#Module.findExportByName('httpc_free');
         if (freePtr === null || freePtr.isNull()) {
             this.constructError = 'Export "httpc_free" not found in module: ' + modulePath;
@@ -58,8 +139,8 @@ class Httpc {
      *
      * @param {string} method - HTTP 方法，如 'GET', 'POST'
      * @param {string} url - 请求的 URL，可以包括 Basic Auth 用户名、密码
-     * @param {Map<string, string> | Httpc.CHttpHeaders} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
-     * @param {string | Utf8String} [body] - 可选的请求体字符串，或指向 C 字符串的指针
+     * @param {Map<string, string> | Httpc.CHttpHeaders | null} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
+     * @param {string | Utf8String | null} [body] - 可选的请求体字符串，或指向 C 字符串的指针
      * @returns {Httpc.HttpResponse | null}
      */
     request(method, url, headers, body) {
@@ -82,11 +163,71 @@ class Httpc {
     }
 
     /**
+     * 异步发送 HTTP(S) 请求
+     *
+     * @param {string} method - HTTP 方法，如 'GET', 'POST'
+     * @param {string} url - 请求的 URL，可以包括 Basic Auth 用户名、密码
+     * @param {Map<string, string> | Httpc.CHttpHeaders | null} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
+     * @param {string | Utf8String | null} [body] - 可选的请求体字符串，或指向 C 字符串的指针
+     * @returns {Promise<Httpc.HttpResponse | null>}
+     */
+    requestAsync(method, url, headers, body) {
+        return new Promise((resolve, reject) => {
+            if (this.constructError) {
+                reject(new Error('Httpc not properly constructed: ' + this.constructError));
+                return;
+            }
+
+            // @ts-expect-error
+            const callback = new NativeCallback((
+                /** @type {Httpc.CHttpResponse} */
+                responsePtr,
+                _contextPtr,
+            ) => {
+                // 从持有引用的数组中移除回调
+                const index = this.#activeCallbacks.indexOf(callback);
+                if (index > -1) {
+                    this.#activeCallbacks.splice(index, 1);
+                }
+
+                try {
+                    const response = this.#handleResponse(responsePtr);
+                    resolve(response);
+                } catch (error) {
+                    resolve(null);
+                } finally {
+                    if (!responsePtr.isNull()) {
+                        this.#Func_FreeResponse(responsePtr);
+                    }
+                }
+            }, 'void', ['pointer', 'pointer'], 'default');
+
+            // 将回调保存到持有引用的数组中，防止被垃圾回收
+            this.#activeCallbacks.push(callback);
+
+            const requestParams = this.#getRequestParams(method, url, headers, body);
+
+            try {
+                // JS 端一次调用创建一个 NativeCallback，不用 context 指针
+                this.#Func_RequestAsync(callback, ptr(0), ...requestParams);
+            } catch (error) {
+                // 从持有引用的数组中移除回调
+                const index = this.#activeCallbacks.indexOf(callback);
+                if (index > -1) {
+                    this.#activeCallbacks.splice(index, 1);
+                }
+
+                reject(error);
+            }
+        });
+    }
+
+    /**
      * 从参数构造请求所需的 NativeFunction 参数
      * @param {string} method - HTTP 方法，如 'GET', 'POST'
      * @param {string} url - 请求的 URL，可以包括 Basic Auth 用户名、密码
-     * @param {Map<string, string> | Httpc.CHttpHeaders} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
-     * @param {string | Utf8String} [body] - 可选的请求体字符串，或指向 C 字符串的指针
+     * @param {Map<string, string> | Httpc.CHttpHeaders | null} [headers] - 可选的请求头，Map 或 CHttpHeaders 指针
+     * @param {string | Utf8String | null} [body] - 可选的请求体字符串，或指向 C 字符串的指针
      * @returns {Parameters<typeof Httpc.func_request>}
      */
     #getRequestParams(method, url, headers, body) {
@@ -205,17 +346,12 @@ class Httpc {
 }
 
 /**
- * 运行单个测试用例
- * @param {Httpc} httpc - Httpc 实例
+ * 处理测试结果的通用函数
  * @param {HttpcTest.TestCase} test - 测试用例对象
- * @param {number} index - 测试索引
+ * @param {Httpc.HttpResponse | null} response - 响应对象
  * @returns {boolean} 是否通过
  */
-function runTest(httpc, test, index) {
-    console.log(`Running test ${index + 1}: ${test.title}`);
-
-    const headers = test.headers;
-    const response = httpc.request(test.method, test.url, headers, test.body);
+function processTestResult(test, response) {
     let ok = true;
 
     if (!response) {
@@ -268,10 +404,47 @@ function runTest(httpc, test, index) {
     return ok;
 }
 
+/**
+ * 运行单个同步测试用例
+ * @param {Httpc} httpc - Httpc 实例
+ * @param {HttpcTest.TestCase} test - 测试用例对象
+ * @param {number} index - 测试索引
+ * @returns {boolean} 是否通过
+ */
+function runSyncTest(httpc, test, index) {
+    console.log(`Running sync test ${index + 1}: ${test.title}`);
+    const response = httpc.request(test.method, test.url, test.headers, test.body);
+    return processTestResult(test, response);
+}
+
+/**
+ * 运行单个异步测试用例
+ * @param {Httpc} httpc - Httpc 实例
+ * @param {HttpcTest.TestCase} test - 测试用例对象
+ * @param {number} index - 测试索引
+ * @returns {Promise<boolean>} 是否通过
+ */
+async function runAsyncTest(httpc, test, index) {
+    console.log(`Running async test ${index + 1}: ${test.title}`);
+    try {
+        const response = await httpc.requestAsync(test.method, test.url, test.headers, test.body);
+        return processTestResult(test, response);
+    } catch (error) {
+        console.log(`  ${colors.red}[FAIL] ${test.title} - Error: ${error}${colors.reset}`);
+        return false;
+    }
+}
+
 rpc.exports = {
     // @ts-ignore
-    init(stage, parameters) { // 测试入口
+    async init(_stage, parameters) { // 测试入口
         g_repoPath = parameters.repoPath;
+
+        // 设置 httpbin endpoint（如果通过参数传入）
+        if (parameters.httpbinEndpoint) {
+            setHttpbinEndpoint(parameters.httpbinEndpoint);
+        }
+
         const httpc = new Httpc(parameters.modulePath);
 
         // 定义测试用例
@@ -286,28 +459,28 @@ rpc.exports = {
                 expected_headers: { 'Content-Type': 'text/html' },
             },
             {
-                title: 'httpbin.org 404',
+                title: 'httpbin 404',
                 method: 'GET',
-                url: 'https://httpbin.org/status/404',
+                url: getHttpbinUrl('/status/404'),
                 expected_status: 404,
             },
             {
-                title: 'httpbin.org 418 teapot',
+                title: 'httpbin 418 teapot',
                 method: 'GET',
-                url: 'https://httpbin.org/status/418',
+                url: getHttpbinUrl('/status/418'),
                 expected_status: 418,
                 expected_body_substr: 'teapot'
             },
             {
-                title: 'httpbin.org 503',
+                title: 'httpbin 503',
                 method: 'GET',
-                url: 'https://httpbin.org/status/503',
+                url: getHttpbinUrl('/status/503'),
                 expected_status: 503,
             },
             {
-                title: 'httpbin.org Chinese qs',
+                title: 'httpbin Chinese qs',
                 method: 'GET',
-                url: 'https://httpbin.org/get?from=TSG%20%E5%8A%A8%E6%80%81%20HTTP(S)%20%E5%BA%93%E6%B5%8B%E8%AF%95',
+                url: getHttpbinUrl('/get?from=TSG%20%E5%8A%A8%E6%80%81%20HTTP(S)%20%E5%BA%93%E6%B5%8B%E8%AF%95'),
                 headers: new Map([
                     ['Accept', 'application/json'],
                 ]),
@@ -315,9 +488,9 @@ rpc.exports = {
                 expected_body_substr: '"from": "TSG \\u52a8\\u6001 HTTP(S) \\u5e93\\u6d4b\\u8bd5"',
             },
             {
-                title: 'httpbin.org POST json',
+                title: 'httpbin POST json',
                 method: 'POST',
-                url: 'https://httpbin.org/post',
+                url: getHttpbinUrl('/post'),
                 headers: new Map([
                     ['Accept', 'application/json'],
                     ['Content-Type', 'application/json'],
@@ -328,9 +501,9 @@ rpc.exports = {
                 expected_headers: { 'Content-Type': 'application/json' },
             },
             {
-                title: 'httpbin.org Bearer',
+                title: 'httpbin Bearer',
                 method: 'GET',
-                url: 'https://httpbin.org/bearer',
+                url: getHttpbinUrl('/bearer'),
                 headers: new Map([
                     ['Accept', 'application/json'],
                     ['Authorization', 'Bearer TSG_TOKEN'],
@@ -339,47 +512,81 @@ rpc.exports = {
                 expected_body_substr: '"token": "TSG_TOKEN"',
             },
             {
-                title: 'httpbin.org BasicAuth',
+                title: 'httpbin BasicAuth',
                 method: 'GET',
-                url: 'https://TSG:TSG-pass@httpbin.org/basic-auth/TSG/TSG-pass',
+                url: getHttpbinUrlWithBasicAuth('TSG', 'TSG-pass', '/basic-auth/TSG/TSG-pass'),
                 headers: new Map([['Accept', 'application/json']]),
                 expected_status: 200,
                 expected_body_substr: '"user": "TSG"',
             },
             {
-                title: 'httpbin.org BasicAuth fail',
+                title: 'httpbin BasicAuth fail',
                 method: 'GET',
-                url: 'https://TSG:TSG-PASS@httpbin.org/basic-auth/TSG/TSG-pass',
+                url: getHttpbinUrlWithBasicAuth('TSG', 'TSG-PASS', '/basic-auth/TSG/TSG-pass'),
                 headers: new Map([['Accept', 'application/json']]),
                 expected_status: 401,
             },
         ];
 
         const ntests = tests.length;
-        let passed = 0;
 
+        // 运行同步测试
+        console.log('--- Running Synchronous Tests ---');
+        let syncPassed = 0;
         for (let i = 0; i < ntests; i++) {
-            if (runTest(httpc, tests[i], i)) {
-                passed++;
+            if (runSyncTest(httpc, tests[i], i)) {
+                syncPassed++;
             }
         }
 
-        const failed = ntests - passed;
+        // 运行异步测试
+        console.log('\n--- Running Asynchronous Tests ---');
+        let asyncPassed = 0;
+
+        // 运行异步测试
+        let asyncResults = [];
+
+        try {
+            // 创建所有异步测试的 Promise
+            const asyncPromises = tests.map((test, index) =>
+                runAsyncTest(httpc, test, index)
+            );
+
+            // 等待所有异步测试完成
+            asyncResults = await Promise.all(asyncPromises);
+        } catch (error) {
+            console.log(`Async tests error: ${error}`);
+            // 将所有异步测试标记为失败
+            asyncResults = new Array(tests.length).fill(false);
+        }
+
+        console.log('\n--- Processing Asynchronous Test Results ---');
+        asyncResults.forEach((passed) => {
+            if (passed) {
+                asyncPassed++;
+            }
+        });
+
+        // 计算总体结果
+        const totalTests = ntests * 2; // 同步 + 异步
+        const totalPassed = syncPassed + asyncPassed;
+        const totalFailed = totalTests - totalPassed;
 
         // 写入失败用例数以便在 CI 中判断，最大不超过 126，因为 127 以上为错误数值保留
         const f = new File(g_repoPath + '\\.tmp_frida_test_result.txt', 'w');
-        f.write(Math.min(failed, 126).toString());
+        f.write(Math.min(totalFailed, 126).toString());
         f.close();
 
         console.log();
-        if (passed > 0) {
-            console.log(`${colors.green}${passed}/${ntests} Passed${colors.reset}`);
-        }
-        if (failed > 0) {
-            console.log(`${colors.red}${failed}/${ntests} Failed${colors.reset}`);
+        console.log(`${colors.green}Sync Tests: ${syncPassed}/${ntests} Passed${colors.reset}`);
+        console.log(`${colors.green}Async Tests: ${asyncPassed}/${ntests} Passed${colors.reset}`);
+        console.log(`${colors.green}Total: ${totalPassed}/${totalTests} Passed${colors.reset}`);
+
+        if (totalFailed > 0) {
+            console.log(`${colors.red}Total Failed: ${totalFailed}/${totalTests}${colors.reset}`);
         }
 
-        if (failed === 0) {
+        if (totalFailed === 0) {
             console.log(`✅ ${colors.green}Okay! All tests passed!${colors.reset}`);
         } else {
             console.log(`\n❌ ${colors.red}Ohh...Some tests failed...\n${colors.reset}`);

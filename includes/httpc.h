@@ -45,6 +45,27 @@ HttpResponse* httpc(
     const char* body
 );
 
+typedef void (*HttpCallback)(HttpResponse* resp, void* context);
+
+/**
+ * 异步发送 HTTP 请求，请求成功后会调用回调函数
+ *
+ * @param callback 请求完成后调用的回调函数
+ * @param context 用户自定义的上下文指针，会在回调时原样返回
+ * @param method HTTP 方法字符串（如 "GET"）
+ * @param url 请求的 URL 地址
+ * @param headers 可选请求头数组；可为 NULL 表示无自定义请求头
+ * @param body 可选请求体（UTF-8 文本）；可为 NULL 表示无请求体
+ */
+void httpc_async(
+    const HttpCallback callback,
+    void* context,
+    const char* method,
+    const char* url,
+    const HttpHeaders* headers,
+    const char* body
+);
+
 /**
  * 释放由 httpc 返回的 HttpResponse*，包括其内部字段的内存。
  */

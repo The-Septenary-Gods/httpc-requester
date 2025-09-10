@@ -92,6 +92,22 @@ Before running tests, you must first build the project in debug mode:
 cargo build
 ```
 
+### Modifying the httpbin Endpoint
+
+The tests use the [httpbin](https://httpbin.org) API to verify request and response parsing. However, since the default endpoint is a free public service, it can have high latency and may occasionally return 503 errors. For more reliable test results, you can deploy your own httpbin server using Docker:
+
+```bash
+docker run -p 80:80 kennethreitz/httpbin
+```
+
+> Docker containers are not supported by default on Windows. You may need to install Docker for Windows to run the server, or you can run it in WSL or on another Linux server.
+
+Then, set the `HTTPBIN_ENDPOINT` environment variable to let the test program use your API endpoint:
+
+```powershell
+$env:HTTPBIN_ENDPOINT = "https://your-custom-httpbin.org" # Replace with your endpoint
+```
+
 ### JSDoc Checking
 
 Before running JSDoc checks for the first time, ensure that Node.js (or Bun, Deno, etc.) and `tsc` are installed.

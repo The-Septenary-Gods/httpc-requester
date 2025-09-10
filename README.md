@@ -85,6 +85,23 @@ console.log(response);
 cargo build
 ```
 
+### 修改 httpbin endpoint
+
+测试中会使用 [httpbin](https://httpbin.org) 的 API 来检查请求和返回解析的正确性。但由于默认 endpoint
+属于免费的公开服务，延迟较高，且有时会出现 503 错误。为了得到更准确的测试结果，可以用 docker 自行部署 httpbin 服务器：
+
+``` Bash
+docker run -p 80:80 kennethreitz/httpbin
+```
+
+> Windows 下默认不支持 docker 容器。可能需要安装 docker for Windows 来运行服务器，也可以在 WSL 或在另一台 Linux 服务器上运行。
+
+然后设置环境变量 `HTTPBIN_ENDPOINT` 来让测试程序使用你的 API endpoint：
+
+``` Powershell
+$env:HTTPBIN_ENDPOINT = "https://your-custom-httpbin.org" # 替换为你的 endpoint
+```
+
 ### JSDoc 检查
 
 第一次运行 JSDoc 检查前，需要确保已安装 Node.js（或 Bun, Deno，下略）和 tsc。

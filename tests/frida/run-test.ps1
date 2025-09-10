@@ -9,8 +9,17 @@ $modulePath = Join-Path -Path $currentDir -ChildPath "target\debug\tsg_httpc.dll
 $repoPath = $currentDir -replace '\\', '\\'
 $modulePath = $modulePath -replace '\\', '\\'
 
+# 获取 HTTPBIN_ENDPOINT 环境变量（如果存在）
+$httpbinEndpoint = $env:HTTPBIN_ENDPOINT
+
 # 构建 JSON 字符串
-$jsonPayload = "{`"repoPath`":`"$repoPath`",`"modulePath`":`"$modulePath`"}"
+if ($httpbinEndpoint) {
+    # 如果有 HTTPBIN_ENDPOINT，转义 JSON 中的转义符
+    $escapedEndpoint = $httpbinEndpoint -replace '\\', '\\' -replace '"', '\"'
+    $jsonPayload = "{`"repoPath`":`"$repoPath`",`"modulePath`":`"$modulePath`",`"httpbinEndpoint`":`"$escapedEndpoint`"}"
+} else {
+    $jsonPayload = "{`"repoPath`":`"$repoPath`",`"modulePath`":`"$modulePath`"}"
+}
 
 # 构建 Frida 命令
 $fridaCommand = "frida -q --exit-on-error -l tests/frida/example-sites.js -P '$jsonPayload' frida.exe"

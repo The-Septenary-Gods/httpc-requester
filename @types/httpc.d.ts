@@ -41,5 +41,14 @@ declare namespace Httpc {
         body: Utf8String | NULL,
     ): CHttpResponse;
 
+    function func_requestAsync(
+        callback: NativeCallback<'void', ['pointer', 'pointer']>,
+        context: NativePointer,
+        method: Utf8String,
+        url: Utf8String,
+        headers: CHttpHeaders | NULL,
+        body: Utf8String | NULL,
+    ): void;
+
     function func_freeResponse(resp: CHttpResponse): void;
 }
